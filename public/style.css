@@ -3,7 +3,7 @@ body {
     font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
     margin: 0;
     padding: 20px;
-    background-image: url('/nike-shoe-inventory/public/images/BackImg.jpg');
+    background-image: url('images/BackImg.jpg');
     background-size: cover;
     background-position: center;
     background-repeat: no-repeat;
