@@ -24,6 +24,17 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
+// Demo mode flag: default can be toggled via URL (?demo=true or ?demo=false)
+const IS_DEMO_MODE = (() => {
+    try {
+        const params = new URLSearchParams(window.location.search);
+        if (params.has('demo')) return params.get('demo') === 'true';
+    } catch (e) {
+        // ignore
+    }
+    // Default to true for portfolio demo; set ?demo=false to disable
+    return true;
+})();
 
 // --- 2. Global State & DOM Elements ---
 const loginPage = document.getElementById('login-page');
@@ -68,6 +79,25 @@ document.getElementById('login-form').addEventListener('submit', async (e) => {
     e.preventDefault();
     const email = document.getElementById('login-email').value;
     const password = document.getElementById('login-password').value;
+
+    // Demo-mode bypass: allow signing in without Firebase auth
+    if (typeof IS_DEMO_MODE !== 'undefined' && IS_DEMO_MODE) {
+        try {
+            // Show dashboard UI immediately
+            loginPage.classList.add('hidden');
+            appDashboard.classList.remove('hidden');
+            document.getElementById('user-display-email').textContent = email || 'Demo User';
+            document.getElementById('user-id-display').textContent = 'ID: demo';
+            showMessage('Signed in (Demo)', 'success');
+            // Initialize dashboard (this will use demo data when IS_DEMO_MODE)
+            initializeDashboard();
+        } catch (err) {
+            console.warn('Demo sign-in failed', err);
+            showMessage('Demo sign-in failed', 'error');
+        }
+        return;
+    }
+
     try {
         const userCredential = await signInWithEmailAndPassword(auth, email, password);
         const signedInEmail = (userCredential && userCredential.user && userCredential.user.email)
@@ -152,38 +182,46 @@ function setupItems() {
     const itemSelects = [document.getElementById('stock-in-item'), document.getElementById('stock-out-item')];
 
     // READ
-    onSnapshot(query(collection(db, 'items'), orderBy('name')), (snapshot) => {
-        const itemsArr = [];
-        let html = '';
-        snapshot.forEach(doc => {
-            const item = { id: doc.id, ...doc.data() };
-            itemsArr.push(item);
-            html += `
-                <tr class="border-b border-border hover:bg-card-header/50">
-                    <td class="p-4 font-semibold">${item.name}</td>
-                    <td class="p-4 text-text-secondary">${item.sku || '-'}</td>
-                    <td class="p-4">${item.category || '-'}</td>
-                    <td class="p-4 ${item.stock < 10 ? 'text-red-400 font-bold' : 'text-green-400'}">${item.stock}</td>
-                        <td class="p-4">₱${Number(item.price).toFixed(2)}</td>
-                    <td class="p-4 flex gap-2">
-                        <button onclick="openEditItemModal('${item.id}')" class="text-blue-400 hover:text-white"><i data-feather="edit-2" class="w-4 h-4"></i></button>
-                        <button onclick="deleteItem('${item.id}')" class="text-red-400 hover:text-white"><i data-feather="trash" class="w-4 h-4"></i></button>
-                    </td>
-                </tr>`;
-        });
-        allItems = itemsArr;
-        tbody.innerHTML = html;
-        feather.replace();
+    if (!IS_DEMO_MODE) {
+        onSnapshot(query(collection(db, 'items'), orderBy('name')), (snapshot) => {
+            const itemsArr = [];
+            let html = '';
+            snapshot.forEach(doc => {
+                const item = { id: doc.id, ...doc.data() };
+                itemsArr.push(item);
+                html += `
+                    <tr class="border-b border-border hover:bg-card-header/50">
+                        <td class="p-4 font-semibold">${item.name}</td>
+                        <td class="p-4 text-text-secondary">${item.sku || '-'}</td>
+                        <td class="p-4">${item.category || '-'}</td>
+                        <td class="p-4 ${item.stock < 10 ? 'text-red-400 font-bold' : 'text-green-400'}">${item.stock}</td>
+                            <td class="p-4">₱${Number(item.price).toFixed(2)}</td>
+                        <td class="p-4 flex gap-2">
+                            <button onclick="openEditItemModal('${item.id}')" class="text-blue-400 hover:text-white"><i data-feather="edit-2" class="w-4 h-4"></i></button>
+                            <button onclick="deleteItem('${item.id}')" class="text-red-400 hover:text-white"><i data-feather="trash" class="w-4 h-4"></i></button>
+                        </td>
+                    </tr>`;
+            });
+            allItems = itemsArr;
+            tbody.innerHTML = html;
+            feather.replace();
 
-        // Update dropdowns
-        const options = '<option value="">Select Item...</option>' + allItems.map(i => `<option value="${i.id}">${i.name} (Stock: ${i.stock})</option>`).join('');
-        itemSelects.forEach(s => s.innerHTML = options);
-    });
+            // Update dropdowns
+            const options = '<option value="">Select Item...</option>' + allItems.map(i => `<option value="${i.id}">${i.name} (Stock: ${i.stock})</option>`).join('');
+            itemSelects.forEach(s => s.innerHTML = options);
+        });
+    }
 
     // CREATE
     document.getElementById('add-item-form').addEventListener('submit', async (e) => {
         e.preventDefault();
         const form = e.target;
+        if (checkDemoMode()) {
+            // Close add modal and reset form to avoid leaving UI in an edit state
+            try { closeModal(document.getElementById('add-item-modal')); } catch (er) {}
+            try { form.reset(); } catch (er) {}
+            return;
+        }
         try {
             await addDoc(collection(db, 'items'), {
                 name: form.name.value,
@@ -203,6 +241,10 @@ function setupItems() {
     document.getElementById('edit-item-form').addEventListener('submit', async (e) => {
         e.preventDefault();
         const id = document.getElementById('edit-item-id').value;
+        if (checkDemoMode()) {
+            try { closeModal(document.getElementById('edit-item-modal')); } catch (er) {}
+            return;
+        }
         try {
             await updateDoc(doc(db, 'items', id), {
                 name: document.getElementById('edit-item-name').value,
@@ -232,6 +274,7 @@ window.openEditItemModal = (id) => {
 };
 
 window.deleteItem = async (id) => {
+    if (checkDemoMode()) return;
     if(confirm('Delete this item?')) {
         try { await deleteDoc(doc(db, 'items', id)); showMessage('Item deleted', 'success'); }
         catch(err) { showMessage(err.message, 'error'); }
@@ -264,10 +307,18 @@ function setupSuppliers() {
         tbody.innerHTML = html;
         feather.replace();
     });
+    // In demo mode we skip real-time listener and rely on loadDemoData()
+    if (IS_DEMO_MODE) {
+        // no-op: demo data will be loaded separately
+    }
 
     // CREATE
     document.getElementById('add-supplier-form').addEventListener('submit', async (e) => {
         e.preventDefault();
+        if (checkDemoMode()) {
+            try { e.target.reset(); } catch (er) {}
+            return;
+        }
         const form = e.target;
         const countryCode = (form.countryCode && form.countryCode.value || '').trim();
         const phoneRaw = (form.phone && form.phone.value || '').trim();
@@ -289,6 +340,10 @@ function setupSuppliers() {
     document.getElementById('edit-supplier-form').addEventListener('submit', async (e) => {
         e.preventDefault();
         const id = document.getElementById('edit-supplier-id').value;
+        if (checkDemoMode()) {
+            try { closeModal(document.getElementById('edit-supplier-modal')); } catch (er) {}
+            return;
+        }
         const phoneVal = (document.getElementById('edit-supplier-phone') && document.getElementById('edit-supplier-phone').value || '').trim();
         if (phoneVal && !validatePhone(phoneVal)) return showMessage('Phone must include country code (e.g., +1)', 'error');
         try {
@@ -316,6 +371,7 @@ function setupSuppliers() {
     };
 
     window.deleteSupplier = async (id) => {
+        if (checkDemoMode()) return;
         if(confirm('Delete supplier?')) {
             try { await deleteDoc(doc(db, 'suppliers', id)); showMessage('Supplier deleted', 'success'); }
             catch(err) { showMessage(err.message, 'error'); }
@@ -349,10 +405,18 @@ function setupUsers() {
         tbody.innerHTML = html;
         feather.replace();
     });
+    // If demo mode is enabled, we will not subscribe to Firestore here — demo data will be rendered instead
+    if (IS_DEMO_MODE) {
+        // no-op
+    }
 
     // ADD USER (Requires Firebase Auth + Firestore)
     document.getElementById('add-user-form').addEventListener('submit', async (e) => {
         e.preventDefault();
+        if (checkDemoMode()) {
+            try { e.target.reset(); } catch (er) {}
+            return;
+        }
         const form = e.target;
         const emailVal = (form.email && form.email.value || '').trim();
         if (!validateEmail(emailVal)) return showMessage('Please enter a valid email (must include @)', 'error');
@@ -396,6 +460,7 @@ function setupUsers() {
     };
 
     window.deleteUser = async (id) => {
+        if (checkDemoMode()) return;
         if(confirm('Delete user record?')) {
             try { await deleteDoc(doc(db, 'users', id)); showMessage('User deleted', 'success'); }
             catch(err) { showMessage(err.message, 'error'); }
@@ -417,46 +482,53 @@ function setupTransactions() {
     document.getElementById('add-stock-out-form').addEventListener('submit', (e) => handleTransaction(e, 'out'));
 
     // 3. Listen to Transactions
-    onSnapshot(query(collection(db, 'transactions'), orderBy('date', 'desc')), (snapshot) => {
-        let recentHtml = '';
-        let inHtml = '';
-        let outHtml = '';
+    if (!IS_DEMO_MODE) {
+        onSnapshot(query(collection(db, 'transactions'), orderBy('date', 'desc')), (snapshot) => {
+            let recentHtml = '';
+            let inHtml = '';
+            let outHtml = '';
 
-        snapshot.forEach(doc => {
-            const t = { id: doc.id, ...doc.data() };
-            const dateStr = t.date ? t.date.toDate().toLocaleDateString() : 'Just now';
-            
-            // Include reason (if present) below the item name for out transactions
-            const reasonHtml = t.reason ? `<div class="text-xs text-text-faded mt-1">Reason: ${t.reason}</div>` : '';
+            snapshot.forEach(doc => {
+                const t = { id: doc.id, ...doc.data() };
+                const dateStr = t.date ? t.date.toDate().toLocaleDateString() : 'Just now';
+                
+                // Include reason (if present) below the item name for out transactions
+                const reasonHtml = t.reason ? `<div class="text-xs text-text-faded mt-1">Reason: ${t.reason}</div>` : '';
 
-            // Common Row HTML
-            const row = `
-                <tr class="border-b border-border hover:bg-card-header/50">
-                    ${t.type ? `<td class="p-4"><span class="px-2 py-1 rounded text-xs font-bold ${t.type==='in'?'bg-green-500/20 text-green-400':'bg-red-500/20 text-red-400'}">${t.type.toUpperCase()}</span></td>` : ''}
-                    <td class="p-4">${t.itemName}${reasonHtml}</td>
-                    <td class="p-4 font-mono">${t.qty}</td>
-                    <td class="p-4 text-sm text-text-secondary">${dateStr}</td>
-                    <td class="p-4">
-                         <button onclick="deleteTransaction('${t.id}', '${t.itemId}', ${t.qty}, '${t.type}')" class="text-red-400 hover:text-white text-xs border border-red-400/30 px-2 py-1 rounded">Delete</button>
-                    </td>
-                </tr>
-            `;
+                // Common Row HTML
+                const row = `
+                    <tr class="border-b border-border hover:bg-card-header/50">
+                        ${t.type ? `<td class="p-4"><span class="px-2 py-1 rounded text-xs font-bold ${t.type==='in'?'bg-green-500/20 text-green-400':'bg-red-500/20 text-red-400'}">${t.type.toUpperCase()}</span></td>` : ''}
+                        <td class="p-4">${t.itemName}${reasonHtml}</td>
+                        <td class="p-4 font-mono">${t.qty}</td>
+                        <td class="p-4 text-sm text-text-secondary">${dateStr}</td>
+                        <td class="p-4">
+                             <button onclick="deleteTransaction('${t.id}', '${t.itemId}', ${t.qty}, '${t.type}')" class="text-red-400 hover:text-white text-xs border border-red-400/30 px-2 py-1 rounded">Delete</button>
+                        </td>
+                    </tr>
+                `;
 
-            if(recentHtml.length < 2000) recentHtml += row; // Limit recent view
-            if(t.type === 'in') inHtml += row.replace(t.type ? /<td.*?>.*?<\/td>/ : '', ''); // Remove type col for specific tables
-            if(t.type === 'out') outHtml += row.replace(t.type ? /<td.*?>.*?<\/td>/ : '', '');
+                if(recentHtml.length < 2000) recentHtml += row; // Limit recent view
+                if(t.type === 'in') inHtml += row.replace(t.type ? /<td.*?>.*?<\/td>/ : '', ''); // Remove type col for specific tables
+                if(t.type === 'out') outHtml += row.replace(t.type ? /<td.*?>.*?<\/td>/ : '', '');
+            });
+
+            recentBody.innerHTML = recentHtml;
+            inBody.innerHTML = inHtml;
+            outBody.innerHTML = outHtml;
         });
-
-        recentBody.innerHTML = recentHtml;
-        inBody.innerHTML = inHtml;
-        outBody.innerHTML = outHtml;
-    });
+    }
 }
 
 // Transaction Handler (Add)
 async function handleTransaction(e, type) {
     e.preventDefault();
     const form = e.target;
+    // Demo mode: prevent stock in/out writes
+    if (checkDemoMode()) {
+        try { form.reset(); } catch (er) {}
+        return;
+    }
     const itemId = type === 'in' ? document.getElementById('stock-in-item').value : document.getElementById('stock-out-item').value;
     const qty = Number(type === 'in' ? document.getElementById('stock-in-qty').value : document.getElementById('stock-out-qty').value);
     if (type === 'out') {
@@ -548,3 +620,208 @@ function showMessage(msg, type) {
     setTimeout(() => box.classList.add('opacity-0', 'translate-y-10'), 3000);
     setTimeout(() => box.classList.add('hidden'), 3300);
 }
+
+// Demo mode helper: shows an alert and prevents writes when enabled
+function checkDemoMode() {
+    if (!IS_DEMO_MODE) return false;
+    try {
+        alert("This is a demo version. Database modifications are disabled.");
+    } catch (e) {
+        console.warn('Demo mode alert failed', e);
+    }
+    return true;
+}
+
+// Show a visible demo banner at the top of the page
+function showDemoBanner() {
+    if (!IS_DEMO_MODE) return;
+    try {
+        if (document.getElementById('demo-banner')) return; // already present
+        const banner = document.createElement('div');
+        banner.id = 'demo-banner';
+        banner.style.position = 'fixed';
+        banner.style.top = '12px';
+        banner.style.left = '50%';
+        banner.style.transform = 'translateX(-50%)';
+        banner.style.zIndex = '9999';
+        banner.style.background = 'linear-gradient(90deg, rgba(245,158,11,0.95), rgba(234,88,12,0.95))';
+        banner.style.color = '#000';
+        banner.style.padding = '8px 14px';
+        banner.style.borderRadius = '999px';
+        banner.style.boxShadow = '0 6px 20px rgba(0,0,0,0.3)';
+        banner.style.fontWeight = '600';
+        banner.style.fontSize = '13px';
+        banner.textContent = 'Demo Mode — Database modifications are disabled.';
+
+        const closeBtn = document.createElement('button');
+        closeBtn.textContent = '×';
+        closeBtn.style.marginLeft = '12px';
+        closeBtn.style.background = 'transparent';
+        closeBtn.style.border = 'none';
+        closeBtn.style.fontSize = '16px';
+        closeBtn.style.cursor = 'pointer';
+        closeBtn.onclick = () => banner.remove();
+        banner.appendChild(closeBtn);
+
+        document.body.appendChild(banner);
+    } catch (e) { console.warn('Failed to show demo banner', e); }
+}
+
+// --- Demo Data Loader ---
+function loadDemoData() {
+    // Demo items
+    const demoItems = [
+        { id: 'itm1', name: 'Gaming Mouse', sku: 'GM-001', category: 'Peripherals', stock: 25, price: 1499.99 },
+        { id: 'itm2', name: 'Mechanical Keyboard', sku: 'MK-101', category: 'Peripherals', stock: 12, price: 3499.50 },
+        { id: 'itm3', name: '24in Monitor', sku: 'MN-240', category: 'Displays', stock: 7, price: 8999.00 }
+    ];
+
+    // Demo suppliers
+    const demoSuppliers = [
+        { id: 'sup1', name: 'TechDistro Inc', contact: 'Alice Mercado', phone: '+63 9123456789' },
+        { id: 'sup2', name: 'Global Electronics', contact: 'Rodrigo Santos', phone: '+1 555-1234' }
+    ];
+
+    // Demo users
+    const demoUsers = [
+        { id: 'usr1', email: 'admin@example.com', role: 'Admin', fullName: 'Admin User' },
+        { id: 'usr2', email: 'staff@example.com', role: 'Staff', fullName: 'Warehouse Staff' }
+    ];
+
+    // Populate items table
+    const itemsTbody = document.getElementById('items-table-body');
+    if (itemsTbody) {
+        let html = '';
+        demoItems.forEach(item => {
+            html += `
+                <tr class="border-b border-border hover:bg-card-header/50">
+                    <td class="p-4 font-semibold">${item.name}</td>
+                    <td class="p-4 text-text-secondary">${item.sku || '-'}</td>
+                    <td class="p-4">${item.category || '-'}</td>
+                    <td class="p-4 ${item.stock < 10 ? 'text-red-400 font-bold' : 'text-green-400'}">${item.stock}</td>
+                    <td class="p-4">₱${Number(item.price).toFixed(2)}</td>
+                    <td class="p-4 flex gap-2">
+                        <button onclick="openEditItemModal('${item.id}')" class="text-blue-400 hover:text-white"><i data-feather="edit-2" class="w-4 h-4"></i></button>
+                        <button onclick="deleteItem('${item.id}')" class="text-red-400 hover:text-white"><i data-feather="trash" class="w-4 h-4"></i></button>
+                    </td>
+                </tr>`;
+        });
+        itemsTbody.innerHTML = html;
+        feather.replace();
+
+        // Update dropdowns
+        allItems = demoItems;
+        const itemSelects = [document.getElementById('stock-in-item'), document.getElementById('stock-out-item')];
+        const options = '<option value="">Select Item...</option>' + allItems.map(i => `<option value="${i.id}">${i.name} (Stock: ${i.stock})</option>`).join('');
+        itemSelects.forEach(s => { if (s) s.innerHTML = options; });
+    }
+
+    // Populate suppliers table
+    const suppliersTbody = document.getElementById('suppliers-table-body');
+    if (suppliersTbody) {
+        let html = '';
+        demoSuppliers.forEach(s => {
+            html += `
+                <tr class="border-b border-border hover:bg-card-header/50">
+                    <td class="p-4 font-semibold">${s.name}</td>
+                    <td class="p-4 text-text-secondary">${s.contact || '-'}</td>
+                    <td class="p-4">${s.phone || '-'}</td>
+                    <td class="p-4 flex gap-2">
+                        <button onclick="openEditSupplierModal('${s.id}')" class="text-blue-400 hover:text-white"><i data-feather="edit-2" class="w-4 h-4"></i></button>
+                        <button onclick="deleteSupplier('${s.id}')" class="text-red-400 hover:text-white"><i data-feather="trash" class="w-4 h-4"></i></button>
+                    </td>
+                </tr>`;
+        });
+        suppliersTbody.innerHTML = html;
+        feather.replace();
+    }
+
+    // Populate users table
+    const usersTbody = document.getElementById('users-table-body');
+    if (usersTbody) {
+        let html = '';
+        demoUsers.forEach(u => {
+            html += `
+                <tr class="border-b border-border hover:bg-card-header/50">
+                    <td class="p-4 font-semibold">${u.email}</td>
+                    <td class="p-4"><span class="px-2 py-1 rounded text-xs ${u.role === 'Admin' ? 'bg-purple-500/20 text-purple-300' : 'bg-blue-500/20 text-blue-300'}">${u.role}</span></td>
+                    <td class="p-4 text-text-secondary">${u.fullName || '-'}</td>
+                    <td class="p-4 flex gap-2">
+                        <button onclick="openEditUserModal('${u.id}')" class="text-blue-400 hover:text-white"><i data-feather="edit-2" class="w-4 h-4"></i></button>
+                        <button onclick="deleteUser('${u.id}')" class="text-red-400 hover:text-white"><i data-feather="trash" class="w-4 h-4"></i></button>
+                    </td>
+                </tr>`;
+        });
+        usersTbody.innerHTML = html;
+        feather.replace();
+    }
+
+    // Demo transactions
+    const demoTransactions = [
+        { id: 'tx1', itemId: 'itm1', itemName: 'Gaming Mouse', type: 'in', qty: 10, date: new Date(Date.now() - 86400000) },
+        { id: 'tx2', itemId: 'itm2', itemName: 'Mechanical Keyboard', type: 'out', qty: 2, date: new Date(Date.now() - 3600000) },
+        { id: 'tx3', itemId: 'itm3', itemName: '24in Monitor', type: 'in', qty: 5, date: new Date() }
+    ];
+
+    // Render transactions into recent, in, out tables
+    const recentBody = document.getElementById('recent-fulfillment-table-body');
+    const inBody = document.getElementById('item-in-transactions-table-body');
+    const outBody = document.getElementById('item-out-transactions-table-body');
+    if (recentBody) {
+        let recentHtml = '';
+        let inHtml = '';
+        let outHtml = '';
+        demoTransactions.forEach(t => {
+            const dateStr = t.date ? t.date.toLocaleDateString() : 'Just now';
+            const reasonHtml = t.reason ? `<div class="text-xs text-text-faded mt-1">Reason: ${t.reason}</div>` : '';
+            const row = `
+                <tr class="border-b border-border hover:bg-card-header/50">
+                    ${t.type ? `<td class="p-4"><span class="px-2 py-1 rounded text-xs font-bold ${t.type==='in'?'bg-green-500/20 text-green-400':'bg-red-500/20 text-red-400'}">${t.type.toUpperCase()}</span></td>` : ''}
+                    <td class="p-4">${t.itemName}${reasonHtml}</td>
+                    <td class="p-4 font-mono">${t.qty}</td>
+                    <td class="p-4 text-sm text-text-secondary">${dateStr}</td>
+                    <td class="p-4">
+                         <button onclick="deleteTransaction('${t.id}', '${t.itemId}', ${t.qty}, '${t.type}')" class="text-red-400 hover:text-white text-xs border border-red-400/30 px-2 py-1 rounded">Delete</button>
+                    </td>
+                </tr>
+            `;
+            recentHtml += row;
+            if (t.type === 'in') inHtml += row.replace(t.type ? /<td.*?>.*?<\/td>/ : '', '');
+            if (t.type === 'out') outHtml += row.replace(t.type ? /<td.*?>.*?<\/td>/ : '', '');
+        });
+        recentBody.innerHTML = recentHtml;
+        if (inBody) inBody.innerHTML = inHtml;
+        if (outBody) outBody.innerHTML = outHtml;
+    }
+}
+
+// Prefill login inputs and load demo data on page load when in demo mode
+window.addEventListener('load', () => {
+    try {
+        if (IS_DEMO_MODE) {
+            const loginEmail = document.getElementById('login-email');
+            const loginPassword = document.getElementById('login-password');
+            if (loginEmail) {
+                loginEmail.value = 'Demo User';
+                loginEmail.placeholder = 'Demo Mode';
+                // Allow clicking Sign In without filling fields
+                try { loginEmail.removeAttribute('required'); } catch (e) {}
+            }
+            if (loginPassword) {
+                loginPassword.value = 'demo123';
+                loginPassword.placeholder = 'Demo Mode';
+                try { loginPassword.removeAttribute('required'); } catch (e) {}
+            }
+
+            // Disable native HTML5 validation for the login form so empty fields won't block submit
+            try { const lf = document.getElementById('login-form'); if (lf) lf.noValidate = true; } catch (e) {}
+
+            // Load demo data into tables
+            loadDemoData();
+            // Show demo banner
+            showDemoBanner();
+        }
+    } catch (e) {
+        console.warn('Demo load handler failed', e);
+    }
+});
