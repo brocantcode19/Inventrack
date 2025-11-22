@@ -3,108 +3,384 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Inventory Tracker</title>
+    <title>InvenTrack Dashboard</title>
+    
+    <script src="https://unpkg.com/feather-icons"></script>
+    
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        background: '#18181b',   /* Zinc 950 */
+                        sidebar: '#09090b',      /* Zinc 950 Darker */
+                        card: 'rgba(39, 39, 42, 0.5)', /* Zinc 800 with opacity */
+                        'card-header': '#27272a', /* Zinc 800 */
+                        primary: '#8b5cf6',      /* Violet 500 */
+                        'text-primary': '#e4e4e7', /* Zinc 200 */
+                        'text-secondary': '#a1a1aa', /* Zinc 400 */
+                        'text-faded': '#52525b',   /* Zinc 600 */
+                        border: '#3f3f46',       /* Zinc 700 */
+                    },
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                    }
+                }
+            }
+        }
+    </script>
+
     <link rel="stylesheet" href="style.css">
+    <!-- libphonenumber-js CDN for strict phone validation -->
+    <script src="https://unpkg.com/libphonenumber-js@1.10.23/bundle/libphonenumber-max.js"></script>
 </head>
-<body>
+<body class="bg-background text-text-primary font-sans antialiased overflow-hidden">
 
-    <div class="container">
-        <h1>Inventory Tracker</h1>
-
-        <!-- Form to Add New Shoes -->
-        <div class="form-container">
-            <form id="add-shoe-form">
-                <input type="text" id="model-name" placeholder="Model Name" required>
-                <div class="row">
-                    <input type="number" id="stock" placeholder="Stock" required>
-                    <input type="number" id="price" placeholder="Price" step="0.01" required>
+    <div id="login-page" class="flex items-center justify-center h-screen w-full p-4 relative z-50">
+        <div class="glass-card neon-glow rounded-xl shadow-2xl w-full max-w-sm p-8 space-y-8">
+            <div class="text-center">
+                <div class="inline-flex items-center justify-center w-16 h-16 rounded-full bg-primary/10 mb-4">
+                    <i data-feather="box" class="text-primary w-8 h-8"></i>
                 </div>
-                <input type="text" id="category" placeholder="Category" required>
-                <textarea id="description" placeholder="Description" required></textarea>
-                <button type="submit" class="btn">Add Shoe</button>
+                <h2 class="text-3xl font-bold text-white tracking-tight">InvenTrack</h2>
+                <p class="text-text-secondary mt-2 text-sm">Inventory Management System</p>
+            </div>
+            <form id="login-form" class="space-y-5">
+                <div>
+                    <label class="block text-xs font-medium text-text-secondary uppercase tracking-wider mb-1.5">Email</label>
+                    <input type="email" id="login-email" required class="w-full bg-black/20 border border-border rounded-lg px-4 py-3 text-white placeholder-text-faded focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all">
+                </div>
+                <div>
+                    <label class="block text-xs font-medium text-text-secondary uppercase tracking-wider mb-1.5">Password</label>
+                    <input type="password" id="login-password" required class="w-full bg-black/20 border border-border rounded-lg px-4 py-3 text-white placeholder-text-faded focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all">
+                </div>
+                <button type="submit" class="w-full bg-primary hover:bg-violet-600 text-white font-semibold px-6 py-3.5 rounded-lg shadow-lg shadow-primary/25 transition-all transform hover:scale-[1.02]">
+                    Sign In
+                </button>
             </form>
         </div>
+    </div>
 
-        <!-- Search Bar -->
-        <div class="search-container">
-            <input type="text" id="search-input" placeholder="Search by name or category...">
-            <button id="search-btn">Search</button>
-        </div>
+    <div id="app-dashboard" class="hidden h-screen flex">
         
-        <!-- Inventory Table -->
-        <div class="table-container">
-            <table id="inventory-table">
-                <thead>
-                    <tr>
-                        <th>ID</th>
-                        <th>Model Name</th>
-                        <th>Stock</th>
-                        <th>Price</th>
-                        <th>Category</th>
-                        <th>Description</th>
-                        <th>Actions</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <!-- Example Row 1 -->
-                    <tr>
-                        <td>1</td>
-                        <td>Air Max 270</td>
-                        <td>120</td>
-                        <td>150.00</td>
-                        <td>Running</td>
-                        <td>Comfortable and stylish running shoe.</td>
-                        <td>
-                            <button class="action-btn edit">Edit</button>
-                            <button class="action-btn delete">Delete</button>
-                        </td>
-                    </tr>
-                    <!-- Example Row 2 -->
-                    <tr>
-                        <td>2</td>
-                        <td>Air Force 1</td>
-                        <td>250</td>
-                        <td>100.00</td>
-                        <td>Lifestyle</td>
-                        <td>Classic iconic lifestyle sneaker.</td>
-                        <td>
-                            <button class="action-btn edit">Edit</button>
-                            <button class="action-btn delete">Delete</button>
-                        </td>
-                    </tr>
-                </tbody>
-            </table>
-        </div>
+        <aside id="app-sidebar" class="w-72 bg-sidebar flex flex-col border-r border-border hidden md:flex transition-all duration-300">
+            <div class="h-20 flex items-center px-8 border-b border-border/50">
+                <i data-feather="layers" class="text-primary w-6 h-6"></i>
+                <h1 class="text-xl font-bold text-white ml-3 tracking-wide">INVENTRACK</h1>
+            </div>
+
+            <div class="px-8 py-6">
+                <div class="glass-card p-4 rounded-xl border border-border/50 flex items-center space-x-3">
+                    <div class="w-10 h-10 rounded-full bg-gradient-to-br from-primary to-purple-800 flex items-center justify-center text-white font-bold text-sm">JS</div>
+                    <div class="overflow-hidden">
+                        <p id="user-display-email" class="text-sm font-medium text-white truncate">loading...</p>
+                        <p id="user-id-display" class="text-xs text-text-secondary truncate mt-0.5">ID: ...</p>
+                    </div>
+                </div>
+            </div>
+
+            <nav class="flex-1 px-4 space-y-1 overflow-y-auto custom-scrollbar">
+                <a href="#" class="nav-link flex items-center space-x-3 px-4 py-3 rounded-lg text-text-secondary hover:text-white hover:bg-white/5 transition-all group" data-page="home">
+                    <i data-feather="grid" class="w-5 h-5 group-hover:text-primary transition-colors"></i>
+                    <span class="font-medium">Dashboard</span>
+                </a>
+                <div class="pt-4 pb-2 px-4 text-xs font-semibold text-text-faded uppercase tracking-wider">Management</div>
+                <a href="#" class="nav-link flex items-center space-x-3 px-4 py-3 rounded-lg text-text-secondary hover:text-white hover:bg-white/5 transition-all group" data-page="users">
+                    <i data-feather="users" class="w-5 h-5 group-hover:text-blue-400 transition-colors"></i>
+                    <span class="font-medium">Users</span>
+                </a>
+                <a href="#" class="nav-link flex items-center space-x-3 px-4 py-3 rounded-lg text-text-secondary hover:text-white hover:bg-white/5 transition-all group" data-page="suppliers">
+                    <i data-feather="truck" class="w-5 h-5 group-hover:text-green-400 transition-colors"></i>
+                    <span class="font-medium">Suppliers</span>
+                </a>
+                <a href="#" class="nav-link flex items-center space-x-3 px-4 py-3 rounded-lg text-text-secondary hover:text-white hover:bg-white/5 transition-all group" data-page="items">
+                    <i data-feather="package" class="w-5 h-5 group-hover:text-yellow-400 transition-colors"></i>
+                    <span class="font-medium">Inventory Items</span>
+                </a>
+                <div class="pt-4 pb-2 px-4 text-xs font-semibold text-text-faded uppercase tracking-wider">Transactions</div>
+                <a href="#" class="nav-link flex items-center space-x-3 px-4 py-3 rounded-lg text-text-secondary hover:text-white hover:bg-white/5 transition-all group" data-page="item-in">
+                    <i data-feather="arrow-down-circle" class="w-5 h-5 group-hover:text-green-500 transition-colors"></i>
+                    <span class="font-medium">Stock In</span>
+                </a>
+                <a href="#" class="nav-link flex items-center space-x-3 px-4 py-3 rounded-lg text-text-secondary hover:text-white hover:bg-white/5 transition-all group" data-page="item-out">
+                    <i data-feather="arrow-up-circle" class="w-5 h-5 group-hover:text-red-500 transition-colors"></i>
+                    <span class="font-medium">Stock Out</span>
+                </a>
+            </nav>
+
+            <div class="p-4 border-t border-border/50">
+                <button id="logout-btn" class="w-full flex items-center justify-center space-x-2 px-4 py-3 rounded-lg bg-red-500/10 text-red-400 hover:bg-red-500 hover:text-white transition-all duration-200">
+                    <i data-feather="log-out" class="w-4 h-4"></i>
+                    <span class="font-medium text-sm">Log Out</span>
+                </button>
+            </div>
+        </aside>
+
+        <main class="flex-1 flex flex-col h-screen overflow-hidden bg-background relative">
+            <header class="h-16 md:hidden flex items-center justify-between px-4 border-b border-border bg-sidebar">
+                <button id="sidebar-toggle" class="text-white"><i data-feather="menu"></i></button>
+                <span class="font-bold text-lg">InvenTrack</span>
+            </header>
+
+            <div class="flex-1 overflow-y-auto p-6 md:p-10 space-y-8 scroll-smooth">
+                
+                <article id="home-section" class="page active space-y-6">
+                    <h2 class="text-2xl font-bold text-white mb-6">Dashboard Overview</h2>
+                    <div class="glass-card neon-glow rounded-xl overflow-hidden border border-border/50">
+                        <div class="p-6 border-b border-border/50 flex justify-between items-center bg-white/5">
+                            <h3 class="text-lg font-semibold text-white">Recent Transaction Log</h3>
+                            <button class="text-xs text-primary hover:text-white transition-colors">View All</button>
+                        </div>
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-left text-sm">
+                                <thead class="bg-black/20 text-text-secondary uppercase text-xs font-semibold tracking-wider">
+                                    <tr>
+                                        <th class="py-4 px-6">Status</th>
+                                        <th class="py-4 px-6">Item Name</th>
+                                        <th class="py-4 px-6">Qty</th>
+                                        <th class="py-4 px-6">Date</th>
+                                        <th class="py-4 px-6 text-right">Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="recent-fulfillment-table-body" class="text-text-primary divide-y divide-border/30"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </article>
+
+                <article id="users-section" class="page space-y-8 hidden">
+                    <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                        <section class="glass-card neon-glow rounded-xl p-6 border border-border/50 h-fit">
+                            <h2 class="text-xl font-bold text-white mb-6 border-b border-border/50 pb-4">Register User</h2>
+                            <form id="add-user-form" class="space-y-4">
+                                <input type="text" name="fullName" placeholder="Full Name" required class="form-input">
+                                <input type="email" name="email" placeholder="Email Address" required class="form-input">
+                                <input type="password" name="password" placeholder="Password" required class="form-input">
+                                <select name="role" class="form-input">
+                                    <option value="Staff">Staff</option>
+                                    <option value="Admin">Admin</option>
+                                </select>
+                                <button type="submit" class="btn-primary w-full mt-2">Create Account</button>
+                            </form>
+                        </section>
+                        <section class="lg:col-span-2 glass-card rounded-xl overflow-hidden border border-border/50">
+                            <div class="p-6 border-b border-border/50 bg-white/5"><h3 class="font-bold text-white">System Users</h3></div>
+                            <div class="overflow-x-auto">
+                                <table class="w-full text-left text-sm">
+                                    <thead class="bg-black/20 text-text-secondary text-xs uppercase font-semibold"><tr><th class="p-4">Email</th><th class="p-4">Role</th><th class="p-4">Name</th><th class="p-4 text-right">Manage</th></tr></thead>
+                                    <tbody id="users-table-body" class="divide-y divide-border/30"></tbody>
+                                </table>
+                            </div>
+                        </section>
+                    </div>
+                </article>
+
+                <article id="suppliers-section" class="page space-y-8 hidden">
+                    <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                        <section class="glass-card neon-glow rounded-xl p-6 border border-border/50 h-fit">
+                            <h2 class="text-xl font-bold text-white mb-6 border-b border-border/50 pb-4">New Supplier</h2>
+                            <form id="add-supplier-form" class="space-y-4">
+                                <input type="text" name="name" placeholder="Company Name" required class="form-input">
+                                <input type="text" name="contact" placeholder="Contact Person" class="form-input">
+                                <input type="email" name="email" placeholder="Email" class="form-input">
+                                <div class="flex gap-2">
+                                    <select name="countryCode" id="supplier-country-code" class="form-input w-1/3" required>
+                                        <option value="+1">+1 (US)</option>
+                                        <option value="+44">+44 (UK)</option>
+                                        <option value="+61">+61 (AU)</option>
+                                        <option value="+91">+91 (IN)</option>
+                                        <option value="+81">+81 (JP)</option>
+                                        <option value="+49">+49 (DE)</option>
+                                        <option value="+33">+33 (FR)</option>
+                                        <option value="+63">+63 (PH)</option>
+                                        <option value="+86">+86 (CN)</option>
+                                        <option value="+234">+234 (NG)</option>
+                                        <!-- Add more as needed -->
+                                    </select>
+                                    <input type="tel" name="phone" id="supplier-phone" placeholder="Phone Number" class="form-input w-2/3" required>
+                                </div>
+                                <button type="submit" class="btn-primary w-full mt-2">Add Supplier</button>
+                            </form>
+                        </section>
+                        <section class="lg:col-span-2 glass-card rounded-xl overflow-hidden border border-border/50">
+                            <div class="p-6 border-b border-border/50 bg-white/5"><h3 class="font-bold text-white">Supplier Directory</h3></div>
+                            <div class="overflow-x-auto">
+                                <table class="w-full text-left text-sm">
+                                    <thead class="bg-black/20 text-text-secondary text-xs uppercase font-semibold"><tr><th class="p-4">Company</th><th class="p-4">Contact</th><th class="p-4 text-right">Manage</th></tr></thead>
+                                    <tbody id="suppliers-table-body" class="divide-y divide-border/30"></tbody>
+                                </table>
+                            </div>
+                        </section>
+                    </div>
+                </article>
+
+                <article id="items-section" class="page space-y-6 hidden">
+                    <div class="flex justify-between items-center">
+                        <h2 class="text-2xl font-bold text-white">Inventory Items</h2>
+                        <button id="open-add-item-modal-btn" class="bg-primary hover:bg-violet-600 text-white px-6 py-2.5 rounded-lg font-semibold shadow-lg shadow-primary/20 transition-all flex items-center gap-2">
+                            <i data-feather="plus" class="w-4 h-4"></i> Add New Item
+                        </button>
+                    </div>
+                    <section class="glass-card neon-glow rounded-xl overflow-hidden border border-border/50">
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-left text-sm">
+                                <thead class="bg-black/20 text-text-secondary text-xs uppercase font-semibold">
+                                    <tr><th class="p-4">Name</th><th class="p-4">SKU</th><th class="p-4">Category</th><th class="p-4">Stock</th><th class="p-4">Price</th><th class="p-4 text-right">Actions</th></tr>
+                                </thead>
+                                <tbody id="items-table-body" class="divide-y divide-border/30"></tbody>
+                            </table>
+                        </div>
+                    </section>
+                </article>
+
+                <article id="item-in-section" class="page space-y-8 hidden">
+                    <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                        <section class="glass-card neon-glow rounded-xl p-6 border border-border/50 h-fit">
+                            <h2 class="text-xl font-bold text-green-400 mb-6 border-b border-border/50 pb-4 flex items-center gap-2"><i data-feather="arrow-down-circle"></i> Stock In</h2>
+                            <form id="add-stock-in-form" class="space-y-4">
+                                <div>
+                                    <label class="text-xs uppercase text-text-secondary font-bold mb-1 block">Select Item</label>
+                                    <select id="stock-in-item" required class="form-input"><option value="">Loading...</option></select>
+                                </div>
+                                <div>
+                                    <label class="text-xs uppercase text-text-secondary font-bold mb-1 block">Quantity to Add</label>
+                                    <input type="number" id="stock-in-qty" placeholder="0" min="1" required class="form-input">
+                                </div>
+                                <button type="submit" class="w-full bg-green-600 hover:bg-green-500 text-white font-bold py-3 rounded-lg shadow-lg shadow-green-900/20 transition-all">Confirm Stock In</button>
+                            </form>
+                        </section>
+                        <section class="lg:col-span-2 glass-card rounded-xl overflow-hidden border border-border/50">
+                            <div class="p-6 border-b border-border/50 bg-white/5"><h3 class="font-bold text-white">Inbound History</h3></div>
+                            <div class="overflow-x-auto">
+                                <table class="w-full text-left text-sm">
+                                    <thead class="bg-black/20 text-text-secondary text-xs uppercase font-semibold"><tr><th class="p-4">Item</th><th class="p-4">Qty</th><th class="p-4">Date</th><th class="p-4 text-right">Manage</th></tr></thead>
+                                    <tbody id="item-in-transactions-table-body" class="divide-y divide-border/30"></tbody>
+                                </table>
+                            </div>
+                        </section>
+                    </div>
+                </article>
+
+                <article id="item-out-section" class="page space-y-8 hidden">
+                    <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                        <section class="glass-card neon-glow rounded-xl p-6 border border-border/50 h-fit">
+                            <h2 class="text-xl font-bold text-red-400 mb-6 border-b border-border/50 pb-4 flex items-center gap-2"><i data-feather="arrow-up-circle"></i> Stock Out</h2>
+                            <form id="add-stock-out-form" class="space-y-4">
+                                <div>
+                                    <label class="text-xs uppercase text-text-secondary font-bold mb-1 block">Select Item</label>
+                                    <select id="stock-out-item" required class="form-input"><option value="">Loading...</option></select>
+                                </div>
+                                <div>
+                                    <label class="text-xs uppercase text-text-secondary font-bold mb-1 block">Quantity to Remove</label>
+                                    <input type="number" id="stock-out-qty" placeholder="0" min="1" required class="form-input">
+                                </div>
+                                <div>
+                                    <label class="text-xs uppercase text-text-secondary font-bold mb-1 block">Reason</label>
+                                    <input type="text" id="stock-out-reason" placeholder="Reason for removal" required class="form-input" />
+                                </div>
+                                <button type="submit" class="w-full bg-red-600 hover:bg-red-500 text-white font-bold py-3 rounded-lg shadow-lg shadow-red-900/20 transition-all">Confirm Stock Out</button>
+                            </form>
+                        </section>
+                        <section class="lg:col-span-2 glass-card rounded-xl overflow-hidden border border-border/50">
+                            <div class="p-6 border-b border-border/50 bg-white/5"><h3 class="font-bold text-white">Outbound History</h3></div>
+                            <div class="overflow-x-auto">
+                                <table class="w-full text-left text-sm">
+                                    <thead class="bg-black/20 text-text-secondary text-xs uppercase font-semibold"><tr><th class="p-4">Item</th><th class="p-4">Qty</th><th class="p-4">Date</th><th class="p-4 text-right">Manage</th></tr></thead>
+                                    <tbody id="item-out-transactions-table-body" class="divide-y divide-border/30"></tbody>
+                                </table>
+                            </div>
+                        </section>
+                    </div>
+                </article>
+
+            </div>
+        </main>
     </div>
 
-    <!-- Edit Modal -->
-    <div id="edit-modal" class="modal">
-        <div class="modal-content">
-            <span class="close-button">&times;</span>
-            <h2>Edit Shoe Details</h2>
-            <form id="edit-shoe-form">
-                <input type="hidden" id="edit-id">
-                <label for="edit-model-name">Model Name</label>
-                <input type="text" id="edit-model-name" required>
-                
-                <label for="edit-stock">Stock</label>
-                <input type="number" id="edit-stock" required>
-                
-                <label for="edit-price">Price</label>
-                <input type="number" id="edit-price" step="0.01" required>
-                
-                <label for="edit-category">Category</label>
-                <input type="text" id="edit-category" required>
-                
-                <label for="edit-description">Description</label>
-                <textarea id="edit-description" required></textarea>
-                
-                <button type="submit" class="btn">Save Changes</button>
+    <div id="add-item-modal" class="hidden fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 transition-opacity">
+        <div class="glass-card neon-glow w-full max-w-lg rounded-xl p-8 shadow-2xl relative border border-border">
+            <button class="close-modal-btn absolute top-4 right-4 text-text-secondary hover:text-white"><i data-feather="x"></i></button>
+            <h2 class="text-2xl font-bold text-white mb-6">Add New Item</h2>
+            <form id="add-item-form" class="space-y-4">
+                <input type="text" name="name" placeholder="Item Name" required class="form-input">
+                <input type="text" name="sku" placeholder="SKU Code" class="form-input">
+                <input type="text" name="category" placeholder="Category" class="form-input">
+                <div class="grid grid-cols-2 gap-4">
+                    <input type="number" name="stock" placeholder="Initial Stock" required class="form-input">
+                    <input type="number" name="price" placeholder="Price ($)" step="0.01" required class="form-input">
+                </div>
+                <div class="pt-4 flex justify-end gap-3">
+                    <button type="button" class="close-modal-btn px-4 py-2 rounded-lg text-text-secondary hover:bg-white/10 transition-colors">Cancel</button>
+                    <button type="submit" class="btn-primary">Save Item</button>
+                </div>
             </form>
         </div>
     </div>
 
-    <script src="script.js"></script>
+    <div id="edit-item-modal" class="hidden fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
+        <div class="glass-card neon-glow w-full max-w-lg rounded-xl p-8 shadow-2xl border border-border">
+            <h2 class="text-2xl font-bold text-white mb-6">Edit Item</h2>
+            <form id="edit-item-form" class="space-y-4">
+                <input type="hidden" id="edit-item-id">
+                <input type="text" id="edit-item-name" required class="form-input">
+                <input type="text" id="edit-item-sku" class="form-input">
+                <input type="text" id="edit-item-category" class="form-input">
+                <div class="grid grid-cols-2 gap-4">
+                    <input type="number" id="edit-item-stock" required class="form-input">
+                    <input type="number" id="edit-item-price" step="0.01" required class="form-input">
+                </div>
+                <div class="pt-4 flex justify-end gap-3">
+                    <button type="button" class="close-modal-btn px-4 py-2 rounded-lg text-text-secondary hover:bg-white/10">Cancel</button>
+                    <button type="submit" class="btn-primary">Update Item</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div id="edit-supplier-modal" class="hidden fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
+        <div class="glass-card neon-glow w-full max-w-lg rounded-xl p-8 shadow-2xl border border-border">
+            <h2 class="text-2xl font-bold text-white mb-6">Edit Supplier</h2>
+            <form id="edit-supplier-form" class="space-y-4">
+                <input type="hidden" id="edit-supplier-id">
+                <input type="text" id="edit-supplier-name" placeholder="Name" required class="form-input">
+                <input type="text" id="edit-supplier-contact" placeholder="Contact Person" class="form-input">
+                <input type="email" id="edit-supplier-email" placeholder="Email" class="form-input">
+                <input type="tel" id="edit-supplier-phone" placeholder="Phone" class="form-input">
+                <div class="pt-4 flex justify-end gap-3">
+                    <button type="button" class="close-modal-btn px-4 py-2 rounded-lg text-text-secondary hover:bg-white/10">Cancel</button>
+                    <button type="submit" class="btn-primary">Update Supplier</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div id="edit-user-modal" class="hidden fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
+        <div class="glass-card neon-glow w-full max-w-lg rounded-xl p-8 shadow-2xl border border-border">
+            <h2 class="text-2xl font-bold text-white mb-6">Edit User Role</h2>
+            <form id="edit-user-form" class="space-y-4">
+                <input type="hidden" id="edit-user-id">
+                <input type="text" id="edit-user-fullname" placeholder="Full Name" required class="form-input">
+                <select id="edit-user-role" class="form-input">
+                    <option value="Staff">Staff</option>
+                    <option value="Admin">Admin</option>
+                </select>
+                <p class="text-xs text-text-faded">Note: To change email/password, delete and recreate the user.</p>
+                <div class="pt-4 flex justify-end gap-3">
+                    <button type="button" class="close-modal-btn px-4 py-2 rounded-lg text-text-secondary hover:bg-white/10">Cancel</button>
+                    <button type="submit" class="btn-primary">Update User</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div id="message-box" class="hidden fixed bottom-6 right-6 p-4 rounded-lg text-white max-w-sm z-[150] shadow-2xl transition-all duration-500 opacity-0 translate-y-10 flex items-center gap-3 border border-white/10 backdrop-blur-md">
+        <div id="message-icon"></div>
+        <p id="message-text" class="font-medium text-sm"></p>
+    </div>
+
+    <script type="module" src="script.js"></script>
+    <script>feather.replace();</script>
 </body>
 </html>
-
